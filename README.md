@@ -20,7 +20,7 @@ project/
 │   ├── users.ipynb
 │   └── hybrid.ipynb
 │
-└── web_app/
+└── web/
     ├── app.py
     ├── model.py
     └── data/
