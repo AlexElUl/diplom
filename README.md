@@ -188,13 +188,7 @@ python -m venv .venv
 Установить зависимости:
 
 ```bash
-pip install -r requirements.txt
-```
-
-Если файла `requirements.txt` нет, основные библиотеки можно установить вручную:
-
-```bash
-pip install pandas numpy scikit-learn scipy implicit joblib streamlit beautifulsoup4 lxml
+pip install -r req.txt
 ```
 
 ### Запуск приложения
