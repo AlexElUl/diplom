@@ -11,7 +11,7 @@
 ## Структура проекта
 
 ```text
-project/
+project/ 
 │
 ├── data_processing_training/
 │   ├── data/
