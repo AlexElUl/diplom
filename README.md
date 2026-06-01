@@ -188,7 +188,7 @@ python -m venv .venv
 Установить зависимости:
 
 ```bash
-pip install -r req.txt
+pip install -r requirements.txt
 ```
 
 ### Запуск приложения
