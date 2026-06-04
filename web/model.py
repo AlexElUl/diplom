@@ -7,6 +7,7 @@ import numpy as np
 import joblib
 from pathlib import Path
 from scipy.sparse import csr_matrix
+from sklearn.linear_model import LinearRegression
 import implicit
 
 ROOT = Path(__file__).parent.parent
@@ -19,7 +20,7 @@ _models_cache = {}
 _knn_neighbors_cache = {}
 
 ALS_FILES = ['als_model.pkl', 'user_to_idx.pkl', 'movie_to_idx.pkl',
-             'movie_ids.pkl', 'user_ids.pkl']
+             'movie_ids.pkl', 'user_ids.pkl', 'als_calibrator.pkl']
 
 
 def _safe_literal_eval(x):
@@ -84,6 +85,9 @@ def load_models(version='current'):
     movie_ids = joblib.load(vpath / 'movie_ids.pkl')
     user_ids = joblib.load(vpath / 'user_ids.pkl')
 
+    calib_path = vpath / 'als_calibrator.pkl'
+    calib = joblib.load(calib_path) if calib_path.exists() else None
+
     movie_id_to_feat_idx = {mid: i for i, mid in enumerate(df_movies['id'])}
     df_movies_by_id = df_movies.set_index('id')
 
@@ -108,6 +112,7 @@ def load_models(version='current'):
         'knn': knn,
         'feature_matrix': feature_matrix,
         'als': als,
+        'calib': calib,
         'user_to_idx': user_to_idx,
         'movie_to_idx': movie_to_idx,
         'movie_ids': movie_ids,
@@ -151,14 +156,15 @@ def _get_knn_neighbors(feat_idx, knn, feature_matrix):
     return _knn_neighbors_cache[feat_idx]
 
 
-def predict_als(user_id, movie_id, als, user_to_idx, movie_to_idx):
+def predict_als(user_id, movie_id, als, user_to_idx, movie_to_idx, calib=None):
     user_idx = user_to_idx.get(user_id)
     movie_idx = movie_to_idx.get(movie_id)
     if user_idx is not None and movie_idx is not None:
-        user_vec = als.user_factors[user_idx]
-        movie_vec = als.item_factors[movie_idx]
-        pred = np.dot(user_vec, movie_vec)
-        pred = 5 + pred * 5
+        raw = np.dot(als.user_factors[user_idx], als.item_factors[movie_idx])
+        if calib is not None:
+            pred = calib.predict([[raw]])[0]
+        else:
+            pred = 5 + raw * 5
         return float(np.clip(pred, 1, 10))
     return 5.0
 
@@ -198,6 +204,7 @@ def hybrid_recommend(user_id, ratings_df, n=10, version='current'):
     knn = models['knn']
     feature_matrix = models['feature_matrix']
     als = models['als']
+    calib = models['calib']
     user_to_idx = models['user_to_idx']
     movie_ids = models['movie_ids']
     alpha = models['alpha']
@@ -219,7 +226,7 @@ def hybrid_recommend(user_id, ratings_df, n=10, version='current'):
             movie_id = int(movie_ids[m_idx])
             if movie_id in already_rated:
                 continue
-            als_score = predict_als(user_id, movie_id, als, user_to_idx, movie_to_idx)
+            als_score = predict_als(user_id, movie_id, als, user_to_idx, movie_to_idx, calib)
             content_score = predict_content(
                 user_id, movie_id, ratings_df, knn, feature_matrix, movie_id_to_feat_idx
             )
@@ -349,11 +356,17 @@ def retrain_als(ratings_df):
     )
     model.fit(matrix)
 
+    u_idx = ratings_df['user_id'].map(user_to_idx).values
+    m_idx = ratings_df['movie_id'].map(movie_to_idx).values
+    raw = np.sum(model.user_factors[u_idx] * model.item_factors[m_idx], axis=1)
+    calib = LinearRegression().fit(raw.reshape(-1, 1), ratings_df['rating'].values)
+
     joblib.dump(model, CURRENT_PATH / 'als_model.pkl')
     joblib.dump(user_to_idx, CURRENT_PATH / 'user_to_idx.pkl')
     joblib.dump(movie_to_idx, CURRENT_PATH / 'movie_to_idx.pkl')
     joblib.dump(user_ids, CURRENT_PATH / 'user_ids.pkl')
     joblib.dump(movie_ids, CURRENT_PATH / 'movie_ids.pkl')
+    joblib.dump(calib, CURRENT_PATH / 'als_calibrator.pkl')
 
     reset_cache()
 
