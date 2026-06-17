@@ -14,15 +14,13 @@ WEB_DATA_DIR = Path(__file__).parent / 'data'
 RATINGS_PATH = WEB_DATA_DIR / 'user_ratings_emulated.csv'
 
 sys.path.insert(0, str(Path(__file__).parent))
+import db
 from model import (load_models, hybrid_recommend, find_similar_users, retrain_als,
                    parse_kinopoisk_html, map_ratings_to_catalog,
                    list_als_versions, users_not_in_model)
 
-WEB_DATA_DIR.mkdir(exist_ok=True)
-if not RATINGS_PATH.exists():
-    original = DATA_PATH / 'user_ratings_emulated.csv'
-    if original.exists():
-        shutil.copy(original, RATINGS_PATH)
+db.ensure_db()
+
 
 st.set_page_config(page_title="Рекомендательная система", layout="wide")
 st.title("Гибридная рекомендательная система")
@@ -48,12 +46,10 @@ if 'name' in df_movies.columns and 'title' not in df_movies.columns:
 
 @st.cache_data
 def load_ratings():
-    if RATINGS_PATH.exists():
-        return pd.read_csv(RATINGS_PATH)
-    return pd.DataFrame(columns=['user_id', 'movie_id', 'rating', 'title'])
+    return db.read_ratings_df()
 
 def save_ratings(df):
-    df.to_csv(RATINGS_PATH, index=False)
+    db.write_ratings_df(df)
     st.cache_data.clear()
 
 ratings_df = load_ratings()
