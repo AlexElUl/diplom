@@ -10,6 +10,10 @@ from scipy.sparse import csr_matrix
 from sklearn.linear_model import LinearRegression
 import implicit
 
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+import db
+
 ROOT = Path(__file__).parent.parent
 DATA_PATH = ROOT / 'data_processing_training' / 'data'
 MODELS_PATH = ROOT / 'data_processing_training' / 'models'
@@ -64,7 +68,7 @@ def load_models(version='current'):
 
     _ensure_current_dir()
 
-    df_movies = pd.read_csv(DATA_PATH / "movies_train.csv")
+    df_movies = db.read_movies_df()
     df_movies = df_movies.reset_index(drop=True)
     df_movies['genres_list'] = df_movies['genres_list'].apply(_safe_literal_eval)
 
@@ -91,7 +95,7 @@ def load_models(version='current'):
     movie_id_to_feat_idx = {mid: i for i, mid in enumerate(df_movies['id'])}
     df_movies_by_id = df_movies.set_index('id')
 
-    df_ratings = pd.read_csv(DATA_PATH / 'user_ratings_emulated.csv')
+    df_ratings = db.read_ratings_df()
     mask = [
         (r in user_to_idx and m in movie_to_idx)
         for r, m in zip(df_ratings['user_id'], df_ratings['movie_id'])
